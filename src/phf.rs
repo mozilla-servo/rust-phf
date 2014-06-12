@@ -9,7 +9,6 @@ use std::fmt;
 use std::hash::Hasher;
 use std::hash::sip::SipHasher;
 use std::slice;
-use std::collections::Collection;
 
 /// An immutable map constructed at compile time.
 ///
@@ -69,7 +68,7 @@ pub fn displace(f1: uint, f2: uint, d1: uint, d2: uint) -> uint {
     d2 + f1 * d1 + f2
 }
 
-impl<T> Collection for PhfMap<T> {
+impl<T> Container for PhfMap<T> {
     fn len(&self) -> uint {
         self.entries.len()
     }
@@ -229,7 +228,7 @@ impl fmt::Show for PhfSet {
     }
 }
 
-impl Collection for PhfSet {
+impl Container for PhfSet {
     #[inline]
     fn len(&self) -> uint {
         self.map.len()
@@ -345,7 +344,7 @@ impl<T: fmt::Show> fmt::Show for PhfOrderedMap<T> {
     }
 }
 
-impl<T> Collection for PhfOrderedMap<T> {
+impl<T> Container for PhfOrderedMap<T> {
     fn len(&self) -> uint {
         self.entries.len()
     }
@@ -554,7 +553,7 @@ impl fmt::Show for PhfOrderedSet {
     }
 }
 
-impl Collection for PhfOrderedSet {
+impl Container for PhfOrderedSet {
     #[inline]
     fn len(&self) -> uint {
         self.map.len()
