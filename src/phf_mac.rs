@@ -10,8 +10,9 @@ extern crate rand;
 extern crate syntax;
 extern crate time;
 extern crate phf;
+extern crate collections;
 
-use std::collections::HashMap;
+use collections::HashMap;
 use std::os;
 use syntax::ast;
 use syntax::ast::{Name, TokenTree, LitStr, Expr, ExprVec, ExprLit};
