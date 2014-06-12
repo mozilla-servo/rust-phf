@@ -1,53 +1,29 @@
-RUSTC := rustc
-BUILDDIR := build
-RUSTFLAGS := -O --cfg ndebug
-INSTALL_DIR := %PREFIX%
+VPATH=%VPATH%
 
-PHF_LIB := src/phf.rs
-PHF := $(foreach file,$(shell $(RUSTC) --crate-file-name $(PHF_LIB)),$(BUILDDIR)/$(file))
-PHF_MAC_LIB := src/phf_mac.rs
-PHF_MAC := $(BUILDDIR)/$(shell $(RUSTC) --crate-file-name $(PHF_MAC_LIB))
-PHF_TEST_MAIN := src/test.rs
-PHF_TEST := $(BUILDDIR)/$(shell $(RUSTC) --crate-file-name $(PHF_TEST_MAIN))
+RUSTC ?= rustc
+RUSTDOC ?= rustdoc
+RUSTFLAGS ?= -O
 
-all: $(PHF) $(PHF_MAC)
+PHF_SRC := $(VPATH)/src/phf.rs
+PHF_MAC_SRC := $(VPATH)/src/phf_mac.rs
+PHF_TEST_SRC := $(VPATH)/src/test.rs
 
--include $(BUILDDIR)/phf.d
--include $(BUILDDIR)/phf_mac.d
--include $(BUILDDIR)/phf_test.d
+all:	phf.dummy phf_mac.dummy
 
-$(BUILDDIR):
-	mkdir -p $@
+phf.dummy: $(PHF_SRC)
+	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
+	touch $@
 
-$(PHF): $(PHF_LIB) | $(BUILDDIR)
-	$(RUSTC) $(RUSTFLAGS) --dep-info $(BUILDDIR)/phf.d --out-dir $(@D) $<
+phf_mac.dummy: $(PHF_MAC_SRC)
+	$(RUSTC) $(RUSTFLAGS) -L . $< --out-dir .
+	touch $@
 
-$(PHF_MAC): $(PHF_MAC_LIB) $(PHF) | $(BUILDDIR)
-	$(RUSTC) $(RUSTFLAGS) --dep-info $(BUILDDIR)/phf_mac.d --out-dir $(@D) \
-		-L $(BUILDDIR) $<
+check: phf_test.dummy
 
-$(PHF_TEST): $(PHF_TEST_MAIN) $(PHF) $(PHF_MAC) | $(BUILDDIR)
-	$(RUSTC) --test $(RUSTFLAGS) -L $(BUILDDIR) \
-		--dep-info $(BUILDDIR)/phf_test.d --out-dir $(@D) $<
-
-doc-test: $(PHF) $(PHF_MAC)
-	rustdoc -L $(BUILDDIR) --test $(PHF_LIB)
-
-check: $(PHF_TEST) doc-test
-	$(PHF_TEST)
-
-doc: $(PHF)
-	rustdoc $(PHF_LIB)
-	rustdoc -L $(BUILDDIR) $(PHF_MAC_LIB)
-
-install: $(PHF) $(PHF_MAC)
-	install $(PHF) $(INSTALL_DIR)
-	install $(PHF_MAC) $(INSTALL_DIR)
+phf_test.dummy: $(PHF_TEST_SRC)
+	$(RUSTC) --test $(RUSTFLAGS) -L . $< --out-dir .
 
 clean:
-	rm -rf $(BUILDDIR)
+	rm -f *.o *.a *.so *.dylib *.rlib *.dll *.dummy *.exe *-test
 
-print-targets:
-	@echo $(PHF_MAC) $(PHF)
-
-.PHONY: all doc-test check doc install clean print-targets
+.PHONY: all check clean
