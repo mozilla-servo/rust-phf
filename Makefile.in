@@ -8,7 +8,9 @@ PHF_SRC := $(VPATH)/src/phf.rs
 PHF_MAC_SRC := $(VPATH)/src/phf_mac.rs
 PHF_TEST_SRC := $(VPATH)/src/test.rs
 
-all:	phf.dummy phf_mac.dummy
+all:
+	$(MAKE) phf.dummy
+	$(MAKE) phf_mac.dummy
 
 phf.dummy: $(PHF_SRC)
 	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
