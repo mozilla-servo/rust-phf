@@ -68,7 +68,7 @@ pub fn displace(f1: uint, f2: uint, d1: uint, d2: uint) -> uint {
     d2 + f1 * d1 + f2
 }
 
-impl<T> Container for PhfMap<T> {
+impl<T> Collection for PhfMap<T> {
     fn len(&self) -> uint {
         self.entries.len()
     }
@@ -82,7 +82,7 @@ impl<'a, T> Map<&'a str, T> for PhfMap<T> {
 
 impl<T: fmt::Show> fmt::Show for PhfMap<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(fmt, r"\{"));
+        try!(write!(fmt, "{{"));
         let mut first = true;
         for (k, v) in self.entries() {
             if !first {
@@ -91,7 +91,7 @@ impl<T: fmt::Show> fmt::Show for PhfMap<T> {
             try!(write!(fmt, "{}: {}", k, v))
             first = false;
         }
-        write!(fmt, r"\}")
+        write!(fmt, "}}")
     }
 }
 
@@ -215,7 +215,7 @@ pub struct PhfSet {
 
 impl fmt::Show for PhfSet {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(fmt, r"\{"));
+        try!(write!(fmt, "{{"));
         let mut first = true;
         for entry in self.iter() {
             if !first {
@@ -224,11 +224,11 @@ impl fmt::Show for PhfSet {
             try!(write!(fmt, "{}", entry));
             first = false;
         }
-        write!(fmt, r"\}")
+        write!(fmt, "}}")
     }
 }
 
-impl Container for PhfSet {
+impl Collection for PhfSet {
     #[inline]
     fn len(&self) -> uint {
         self.map.len()
@@ -331,7 +331,7 @@ pub struct PhfOrderedMap<T> {
 
 impl<T: fmt::Show> fmt::Show for PhfOrderedMap<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(fmt, r"\{"));
+        try!(write!(fmt, "{{"));
         let mut first = true;
         for (k, v) in self.entries() {
             if !first {
@@ -340,11 +340,11 @@ impl<T: fmt::Show> fmt::Show for PhfOrderedMap<T> {
             try!(write!(fmt, "{}: {}", k, v))
             first = false;
         }
-        write!(fmt, r"\}")
+        write!(fmt, "}}")
     }
 }
 
-impl<T> Container for PhfOrderedMap<T> {
+impl<T> Collection for PhfOrderedMap<T> {
     fn len(&self) -> uint {
         self.entries.len()
     }
@@ -540,7 +540,7 @@ pub struct PhfOrderedSet {
 
 impl fmt::Show for PhfOrderedSet {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(fmt, r"\{"));
+        try!(write!(fmt, "{{"));
         let mut first = true;
         for entry in self.iter() {
             if !first {
@@ -549,11 +549,11 @@ impl fmt::Show for PhfOrderedSet {
             try!(write!(fmt, "{}", entry));
             first = false;
         }
-        write!(fmt, r"\}")
+        write!(fmt, "}}")
     }
 }
 
-impl Container for PhfOrderedSet {
+impl Collection for PhfOrderedSet {
     #[inline]
     fn len(&self) -> uint {
         self.map.len()
