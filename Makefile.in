@@ -5,14 +5,12 @@ RUSTDOC ?= rustdoc
 RUSTFLAGS ?= -O
 HOST_RUSTFLAGS ?= -O
 
+
 PHF_SRC := $(VPATH)/src/phf.rs
 PHF_MAC_SRC := $(VPATH)/src/phf_mac.rs
 PHF_TEST_SRC := $(VPATH)/src/test.rs
 
-all:
-	$(MAKE) phf.dummy
-	$(MAKE) phf_host.dummy
-	$(MAKE) phf_mac.dummy
+all: phf.dummy phf_host.dummy phf_mac.dummy
 
 phf.dummy: $(PHF_SRC)
 	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
@@ -25,14 +23,15 @@ phf_host.dummy: $(PHF_SRC)
 	$(RUSTC) $(HOST_RUSTFLAGS) $< --out-dir host
 	touch $@
 
-phf_mac.dummy: $(PHF_MAC_SRC)
+phf_mac.dummy: $(PHF_MAC_SRC) phf_host.dummy
 	$(RUSTC) $(HOST_RUSTFLAGS) -L host $< --out-dir .
 	touch $@
 
-check: phf_test.dummy
+check: phf-test
+	./phf-test
 
-phf_test.dummy: $(PHF_TEST_SRC)
-	$(RUSTC) --test $(RUSTFLAGS) -L . $< --out-dir .
+phf-test: $(PHF_TEST_SRC) phf.dummy phf_mac.dummy
+	$(RUSTC) $(RUSTFLAGS) -L . $< -o $@ --test
 
 clean:
 	rm -rf host

@@ -1,0 +1,12 @@
+[package]
+
+name = "phf_mac"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+version = "0.0.0"
+
+[[lib]]
+
+name = "phf_mac"
+path = "src/lib.rs"
+plugin = true
+test = false

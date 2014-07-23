@@ -1,3 +1,5 @@
 /build/
 /doc/
 /Makefile
+/phf/target/
+/phf_mac/target/
