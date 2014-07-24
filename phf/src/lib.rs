@@ -396,7 +396,7 @@ impl<K, V> Collection for PhfOrderedMap<K, V> {
 
 impl<'a, K: Hash+Eq, V> Map<K, V> for PhfOrderedMap<K, V> {
     fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-        self.find_entry(key).map(|e| {
+        self.get_entry(key, |k| key == k).map(|e| {
             let &(_, ref v) = e;
             v
         })
@@ -404,13 +404,14 @@ impl<'a, K: Hash+Eq, V> Map<K, V> for PhfOrderedMap<K, V> {
 }
 
 impl<K: Hash+Eq, V> PhfOrderedMap<K, V> {
-    fn find_entry<'a>(&'a self, key: &K) -> Option<&'a (K, V)> {
+    fn get_entry<'a, T: Hash>(&'a self, key: &T, check: |&K| -> bool)
+                              -> Option<&'a (K, V)> {
         let (g, f1, f2) = shared::hash(key, self.k1, self.k2);
         let (d1, d2) = self.disps[g % self.disps.len()];
         let idx = self.idxs[shared::displace(f1, f2, d1, d2) % self.idxs.len()];
         let entry @ &(ref s, _) = &self.entries[idx];
 
-        if s == key {
+        if check(s) {
             Some(entry)
         } else {
             None
@@ -422,7 +423,26 @@ impl<K: Hash+Eq, V> PhfOrderedMap<K, V> {
     ///
     /// This can be useful for interning schemes.
     pub fn find_key<'a>(&'a self, key: &K) -> Option<&'a K> {
-        self.find_entry(key).map(|e| {
+        self.get_entry(key, |k| key == k).map(|e| {
+            let &(ref k, _) = e;
+            k
+        })
+    }
+
+    /// Like `find`, but can operate on any type that is equivalent to a key.
+    pub fn find_equiv<'a, T: Hash+Equiv<K>>(&'a self, key: &T)
+                                            -> Option<&'a V> {
+        self.get_entry(key, |k| key.equiv(k)).map(|e| {
+            let &(_, ref v) = e;
+            v
+        })
+    }
+
+    /// Like `find_key`, but can operate on any type that is equivalent to a
+    /// key.
+    pub fn find_key_equiv<'a, T: Hash+Equiv<K>>(&'a self, key: &T)
+                                                -> Option<&'a K> {
+        self.get_entry(key, |k| key.equiv(k)).map(|e| {
             let &(ref k, _) = e;
             k
         })
