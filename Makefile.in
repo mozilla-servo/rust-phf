@@ -5,34 +5,33 @@ RUSTDOC ?= rustdoc
 RUSTFLAGS ?= -O
 HOST_RUSTFLAGS ?= -O
 
-PHF_SRC := $(VPATH)/src/phf.rs
-PHF_MAC_SRC := $(VPATH)/src/phf_mac.rs
-PHF_TEST_SRC := $(VPATH)/src/test.rs
 
-all:
-	$(MAKE) phf.dummy
-	$(MAKE) phf_host.dummy
-	$(MAKE) phf_mac.dummy
+PHF_SRC := $(VPATH)/phf/src/lib.rs
+PHF_MAC_SRC := $(VPATH)/phf_mac/src/lib.rs
+PHF_TEST_SRC := $(VPATH)/phf/src/test.rs
+
+all: phf.dummy phf_host.dummy phf_mac.dummy
 
 phf.dummy: $(PHF_SRC)
-	$(RUSTC) $(RUSTFLAGS) $< --out-dir .
+	$(RUSTC) $(RUSTFLAGS) $< --out-dir . --crate-type rlib
 	touch $@
 
 # phf_mac depends on phf, so it must be built once for
 # the target platform, and again for the host platform.
 phf_host.dummy: $(PHF_SRC)
 	mkdir -p host
-	$(RUSTC) $(HOST_RUSTFLAGS) $< --out-dir host
+	$(RUSTC) $(HOST_RUSTFLAGS) $< --out-dir host --crate-type rlib
 	touch $@
 
-phf_mac.dummy: $(PHF_MAC_SRC)
+phf_mac.dummy: $(PHF_MAC_SRC) phf_host.dummy
 	$(RUSTC) $(HOST_RUSTFLAGS) -L host $< --out-dir .
 	touch $@
 
-check: phf_test.dummy
+check: phf-test
+	./phf-test
 
-phf_test.dummy: $(PHF_TEST_SRC)
-	$(RUSTC) --test $(RUSTFLAGS) -L . $< --out-dir .
+phf-test: $(PHF_TEST_SRC) phf.dummy phf_mac.dummy
+	$(RUSTC) $(RUSTFLAGS) -L . $< -o $@ --test
 
 clean:
 	rm -rf host

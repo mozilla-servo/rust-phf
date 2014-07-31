@@ -1,22 +1,24 @@
 //! Compiler plugin for Rust-PHF
 //!
 //! See the documentation for the `phf` crate for more details.
-#![crate_id="github.com/sfackler/rust-phf/phf_mac"]
+#![crate_name="phf_mac"]
 #![crate_type="dylib"]
 #![doc(html_root_url="http://sfackler.github.io/rust-phf/doc")]
-#![feature(plugin_registrar, quote)]
+#![feature(plugin_registrar, quote, default_type_params)]
 
 extern crate rand;
 extern crate syntax;
 extern crate time;
-extern crate phf;
 extern crate rustc;
 
 use std::collections::HashMap;
 use std::gc::{Gc, GC};
+use std::hash;
+use std::hash::Hash;
 use std::os;
+use std::rc::Rc;
 use syntax::ast;
-use syntax::ast::{TokenTree, LitStr, Expr, ExprVec, ExprLit};
+use syntax::ast::{TokenTree, LitStr, LitBinary, LitByte, LitChar, Expr, ExprVec, ExprLit};
 use syntax::codemap::Span;
 use syntax::ext::base::{DummyResult,
                         ExtCtxt,
@@ -24,8 +26,12 @@ use syntax::ext::base::{DummyResult,
                         MacExpr};
 use syntax::parse;
 use syntax::parse::token::{InternedString, COMMA, EOF, FAT_ARROW};
+use syntax::print::pprust;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rustc::plugin::Registry;
+
+#[path="../../shared/mod.rs"]
+mod shared;
 
 static DEFAULT_LAMBDA: uint = 5;
 
@@ -40,8 +46,43 @@ pub fn macro_registrar(reg: &mut Registry) {
     reg.register_macro("phf_ordered_set", expand_phf_ordered_set);
 }
 
+#[deriving(PartialEq, Eq, Clone)]
+enum Key {
+    KeyStr(InternedString),
+    KeyBinary(Rc<Vec<u8>>),
+    KeyChar(char),
+    KeyU8(u8),
+    KeyI8(i8),
+    KeyU16(u16),
+    KeyI16(i16),
+    KeyU32(u32),
+    KeyI32(i32),
+    KeyU64(u64),
+    KeyI64(i64),
+    KeyBool(bool),
+}
+
+impl<S: hash::Writer> Hash<S> for Key {
+    fn hash(&self, state: &mut S) {
+        match *self {
+            KeyStr(ref s) => s.get().hash(state),
+            KeyBinary(ref b) => b.hash(state),
+            KeyChar(c) => c.hash(state),
+            KeyU8(b) => b.hash(state),
+            KeyI8(b) => b.hash(state),
+            KeyU16(b) => b.hash(state),
+            KeyI16(b) => b.hash(state),
+            KeyU32(b) => b.hash(state),
+            KeyI32(b) => b.hash(state),
+            KeyU64(b) => b.hash(state),
+            KeyI64(b) => b.hash(state),
+            KeyBool(b) => b.hash(state),
+        }
+    }
+}
+
 struct Entry {
-    key_str: InternedString,
+    key_contents: Key,
     key: Gc<Expr>,
     value: Gc<Expr>
 }
@@ -125,9 +166,9 @@ fn parse_map(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
     let mut bad = false;
     while parser.token != EOF {
         let key = cx.expand_expr(parser.parse_expr());
-        let key_str = parse_str(cx, key).unwrap_or_else(|| {
+        let key_contents = parse_key(cx, key).unwrap_or_else(|| {
             bad = true;
-            InternedString::new("")
+            KeyStr(InternedString::new(""))
         });
 
         if !parser.eat(&FAT_ARROW) {
@@ -138,7 +179,7 @@ fn parse_map(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
         let value = parser.parse_expr();
 
         entries.push(Entry {
-            key_str: key_str,
+            key_contents: key_contents,
             key: key,
             value: value
         });
@@ -149,10 +190,10 @@ fn parse_map(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
         }
     }
 
-    if entries.len() > phf::MAX_SIZE {
+    if entries.len() > shared::MAX_SIZE {
         cx.span_err(parser.span,
                     format!("maps with more than {} entries are not supported",
-                            phf::MAX_SIZE).as_slice());
+                            shared::MAX_SIZE).as_slice());
         return None;
     }
 
@@ -172,13 +213,13 @@ fn parse_set(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
     let mut bad = false;
     while parser.token != EOF {
         let key = cx.expand_expr(parser.parse_expr());
-        let key_str = parse_str(cx, key).unwrap_or_else(|| {
+        let key_contents = parse_key(cx, key).unwrap_or_else(|| {
             bad = true;
-            InternedString::new("")
+            KeyStr(InternedString::new(""))
         });
 
         entries.push(Entry {
-            key_str: key_str,
+            key_contents: key_contents,
             key: key,
             value: value,
         });
@@ -189,10 +230,10 @@ fn parse_set(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
         }
     }
 
-    if entries.len() > phf::MAX_SIZE {
+    if entries.len() > shared::MAX_SIZE {
         cx.span_err(parser.span,
                     format!("maps with more than {} entries are not supported",
-                            phf::MAX_SIZE).as_slice());
+                            shared::MAX_SIZE).as_slice());
         return None;
     }
 
@@ -203,19 +244,31 @@ fn parse_set(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
     Some(entries)
 }
 
-fn parse_str(cx: &mut ExtCtxt, e: &Expr) -> Option<InternedString> {
+fn parse_key(cx: &mut ExtCtxt, e: &Expr) -> Option<Key> {
     match e.node {
         ExprLit(lit) => {
             match lit.node {
-                LitStr(ref s, _) => Some(s.clone()),
+                ast::LitStr(ref s, _) => Some(KeyStr(s.clone())),
+                ast::LitBinary(ref b) => Some(KeyBinary(b.clone())),
+                ast::LitByte(b) => Some(KeyU8(b)),
+                ast::LitChar(c) => Some(KeyChar(c)),
+                ast::LitInt(i, ast::TyI8) => Some(KeyI8(i as i8)),
+                ast::LitInt(i, ast::TyI16) => Some(KeyI16(i as i16)),
+                ast::LitInt(i, ast::TyI32) => Some(KeyI32(i as i32)),
+                ast::LitInt(i, ast::TyI64) => Some(KeyI64(i as i64)),
+                ast::LitUint(i, ast::TyU8) => Some(KeyU8(i as u8)),
+                ast::LitUint(i, ast::TyU16) => Some(KeyU16(i as u16)),
+                ast::LitUint(i, ast::TyU32) => Some(KeyU32(i as u32)),
+                ast::LitUint(i, ast::TyU64) => Some(KeyU64(i as u64)),
+                ast::LitBool(b) => Some(KeyBool(b)),
                 _ => {
-                    cx.span_err(e.span, "expected string literal");
+                    cx.span_err(e.span, "unsupported literal type");
                     None
                 }
             }
         }
         _ => {
-            cx.span_err(e.span, "expected string literal");
+            cx.span_err(e.span, "expected a literal");
             None
         }
     }
@@ -225,18 +278,19 @@ fn has_duplicates(cx: &mut ExtCtxt, sp: Span, entries: &[Entry]) -> bool {
     let mut dups = false;
     let mut strings = HashMap::new();
     for entry in entries.iter() {
-        let spans = strings.find_or_insert(entry.key_str.clone(), vec![]);
+        let &(ref mut spans, _) = strings.find_or_insert(&entry.key_contents,
+                                                         (vec![], &entry.key));
         spans.push(entry.key.span);
     }
 
-    for (key, spans) in strings.iter() {
+    for &(ref spans, key) in strings.values() {
         if spans.len() == 1 {
             continue;
         }
 
         dups = true;
-        cx.span_err(sp,
-                format!("duplicate key `{}`", key).as_slice());
+        cx.span_err(sp, format!("duplicate key {}",
+                                pprust::expr_to_string(&**key)).as_slice());
         for span in spans.iter() {
             cx.span_note(*span, "one occurrence here");
         }
@@ -284,7 +338,7 @@ fn try_generate_hash(entries: &[Entry], rng: &mut XorShiftRng)
     let k2 = rng.gen();
 
     let hashes: Vec<Hashes> = entries.iter().map(|entry| {
-        let (g, f1, f2) = phf::hash(entry.key_str.get(), k1, k2);
+        let (g, f1, f2) = shared::hash(&entry.key_contents, k1, k2);
         Hashes {
             g: g,
             f1: f1,
@@ -309,15 +363,15 @@ fn try_generate_hash(entries: &[Entry], rng: &mut XorShiftRng)
     let mut try_map = HashMap::new();
     'buckets: for bucket in buckets.iter() {
         for d1 in range(0, table_len) {
-            'disps_l: for d2 in range(0, table_len) {
+            'disps: for d2 in range(0, table_len) {
                 try_map.clear();
                 for &key in bucket.keys.iter() {
-                    let idx = phf::displace(hashes.get(key).f1,
-                                            hashes.get(key).f2,
-                                            d1,
-                                            d2) % table_len;
+                    let idx = shared::displace(hashes.get(key).f1,
+                                               hashes.get(key).f2,
+                                               d1,
+                                               d2) % table_len;
                     if map.get(idx).is_some() || try_map.find(&idx).is_some() {
-                        continue 'disps_l;
+                        continue 'disps;
                     }
                     try_map.insert(idx, key);
                 }
@@ -361,8 +415,8 @@ fn create_map(cx: &mut ExtCtxt, sp: Span, entries: Vec<Entry>, state: HashState)
     MacExpr::new(quote_expr!(cx, ::phf::PhfMap {
         k1: $k1,
         k2: $k2,
-        disps: &'static $disps,
-        entries: &'static $entries,
+        disps: &$disps,
+        entries: &$entries,
     }))
 }
 
@@ -392,9 +446,9 @@ fn create_ordered_map(cx: &mut ExtCtxt, sp: Span, entries: Vec<Entry>,
     MacExpr::new(quote_expr!(cx, ::phf::PhfOrderedMap {
         k1: $k1,
         k2: $k2,
-        disps: &'static $disps,
-        idxs: &'static $idxs,
-        entries: &'static $entries,
+        disps: &$disps,
+        idxs: &$idxs,
+        entries: &$entries,
     }))
 }
 
