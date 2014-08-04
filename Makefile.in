@@ -33,6 +33,15 @@ check: phf-test
 phf-test: $(PHF_TEST_SRC) phf.dummy phf_mac.dummy
 	$(RUSTC) $(RUSTFLAGS) -L . $< -o $@ --test
 
+.PHONY: doc
+doc: $(RUSTDOC_TARGET)/phf/index.html $(RUSTDOC_TARGET)/phf_mac/index.html
+
+$(RUSTDOC_TARGET)/phf/index.html: $(PHF_SRC)
+	$(RUSTDOC) $(RUSTDOC_FLAGS) $< -o $(RUSTDOC_TARGET)
+
+$(RUSTDOC_TARGET)/phf_mac/index.html: $(PHF_MAC_SRC)
+	$(RUSTDOC) $(RUSTDOC_FLAGS) $< -o $(RUSTDOC_TARGET)
+
 clean:
 	rm -rf host
 	rm -f *.o *.a *.so *.dylib *.rlib *.dll *.dummy *.exe *-test
