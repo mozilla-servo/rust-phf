@@ -8,7 +8,7 @@ HOST_RUSTFLAGS ?= -O
 
 PHF_SRC := $(VPATH)/phf/src/lib.rs
 PHF_MAC_SRC := $(VPATH)/phf_mac/src/lib.rs
-PHF_TEST_SRC := $(VPATH)/phf/src/test.rs
+PHF_TEST_SRC := $(VPATH)/phf/tests/test.rs
 
 all: phf.dummy phf_host.dummy phf_mac.dummy
 

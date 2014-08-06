@@ -4,3 +4,5 @@
 /phf/target/
 /phf_mac/target/
 /doc
+target/
+Cargo.lock

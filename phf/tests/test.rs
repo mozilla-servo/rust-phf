@@ -115,6 +115,23 @@ mod map {
         assert_eq!(Some(&0), map.find_equiv(&"a".to_string().as_slice()));
     }
 
+    #[test]
+    fn test_index_ok() {
+        static map: PhfMap<&'static str, int> = phf_map!(
+            "a" => 0,
+        );
+        assert_eq!(0, map["a"]);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_index_fail() {
+        static map: PhfMap<&'static str, int> = phf_map!(
+            "a" => 0,
+        );
+        map["b"];
+    }
+
     macro_rules! test_key_type(
         ($t:ty, $($k:expr => $v:expr),+) => ({
             static map: PhfMap<$t, int> = phf_map! {
@@ -224,6 +241,15 @@ mod set {
         assert!(set.contains(&"world"));
         assert_eq!(2, set.len());
     }
+
+    #[test]
+    fn test_non_static_str_contains() {
+        static SET: PhfSet<&'static str> = phf_set! {
+            "hello",
+            "world",
+        };
+        assert!(SET.contains_equiv(&"hello".to_string().as_slice()));
+    }
 }
 
 mod ordered_map {
@@ -283,6 +309,31 @@ mod ordered_map {
         let vec = MAP.values().map(|&v| v).collect::<Vec<_>>();
         assert_eq!(vec, vec!(10i, 11, 12));
     }
+
+    #[test]
+    fn test_index_ok() {
+        static map: PhfOrderedMap<&'static str, int> = phf_ordered_map!(
+            "a" => 0,
+        );
+        assert_eq!(0, map["a"]);
+    }
+
+    #[test]
+    #[should_fail]
+    fn test_index_fail() {
+        static map: PhfOrderedMap<&'static str, int> = phf_ordered_map!(
+            "a" => 0,
+        );
+        map["b"];
+    }
+
+    #[test]
+    fn test_non_static_str_key() {
+        static map: PhfOrderedMap<&'static str, int> = phf_ordered_map!(
+            "a" => 0,
+        );
+        assert_eq!(Some(&0), map.find_equiv(&"a".to_string().as_slice()));
+    }
 }
 
 mod ordered_set {
@@ -321,5 +372,14 @@ mod ordered_set {
         };
         let vec = SET.iter().map(|&e| e).collect::<Vec<_>>();
         assert_eq!(vec, vec!("hello", "there", "world"));
+    }
+
+    #[test]
+    fn test_non_static_str_contains() {
+        static SET: PhfOrderedSet<&'static str> = phf_ordered_set! {
+            "hello",
+            "world",
+        };
+        assert!(SET.contains_equiv(&"hello".to_string().as_slice()));
     }
 }

@@ -24,6 +24,7 @@ use syntax::ext::base::{DummyResult,
                         ExtCtxt,
                         MacResult,
                         MacExpr};
+use syntax::fold::Folder;
 use syntax::parse;
 use syntax::parse::token::{InternedString, COMMA, EOF, FAT_ARROW};
 use syntax::print::pprust;
@@ -165,8 +166,8 @@ fn parse_map(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
 
     let mut bad = false;
     while parser.token != EOF {
-        let key = cx.expand_expr(parser.parse_expr());
-        let key_contents = parse_key(cx, key).unwrap_or_else(|| {
+        let key = cx.expander().fold_expr(parser.parse_expr());
+        let key_contents = parse_key(cx, &*key).unwrap_or_else(|| {
             bad = true;
             KeyStr(InternedString::new(""))
         });
@@ -212,8 +213,8 @@ fn parse_set(cx: &mut ExtCtxt, tts: &[TokenTree]) -> Option<Vec<Entry>> {
 
     let mut bad = false;
     while parser.token != EOF {
-        let key = cx.expand_expr(parser.parse_expr());
-        let key_contents = parse_key(cx, key).unwrap_or_else(|| {
+        let key = cx.expander().fold_expr(parser.parse_expr());
+        let key_contents = parse_key(cx, &*key).unwrap_or_else(|| {
             bad = true;
             KeyStr(InternedString::new(""))
         });
@@ -366,11 +367,11 @@ fn try_generate_hash(entries: &[Entry], rng: &mut XorShiftRng)
             'disps: for d2 in range(0, table_len) {
                 try_map.clear();
                 for &key in bucket.keys.iter() {
-                    let idx = shared::displace(hashes.get(key).f1,
-                                               hashes.get(key).f2,
+                    let idx = shared::displace(hashes[key].f1,
+                                               hashes[key].f2,
                                                d1,
                                                d2) % table_len;
-                    if map.get(idx).is_some() || try_map.find(&idx).is_some() {
+                    if map[idx].is_some() || try_map.find(&idx).is_some() {
                         continue 'disps;
                     }
                     try_map.insert(idx, key);
@@ -405,7 +406,7 @@ fn create_map(cx: &mut ExtCtxt, sp: Span, entries: Vec<Entry>, state: HashState)
     let disps = create_slice_expr(disps, sp);
 
     let entries = state.map.iter().map(|&idx| {
-        let &Entry { key, value, .. } = entries.get(idx);
+        let &Entry { key, value, .. } = &entries[idx];
         quote_expr!(&*cx, ($key, $value))
     }).collect();
     let entries = create_slice_expr(entries, sp);
